@@ -18,12 +18,6 @@ conda activate oshgr
 python Pretrain.py
 ```
 
-## Training 
-
-```bash
-python main.py
-```
-
 ## Evaluation
 ### on Few-shot incremental learning under unconstrained viewpoint
 
