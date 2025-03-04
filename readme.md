@@ -12,6 +12,12 @@ conda env create -f environment.yml
 conda activate oshgr
 ```
 
+## MANO for OHG dataset
+```
+cd GestureMano
+python show.py
+```
+
 ## Pretrain
 
 ```bash
@@ -29,8 +35,8 @@ python main.py
 ## TODO
 
 - [ ] Clean the redundant codes
-- [ ] Upload the code and the dataset.
-- [ ] Release the code and the dataset.
+- [x] Upload mano parameters for OHG dataset.
+- [ ] upload processed OHG dataset.
 
 
 

@@ -21,7 +21,7 @@ wheels/
 # PyTorch
 *.pth
 *.pt
-*.pkl
+# *.pkl
 .pytorch/
 lightning_logs/
 wandb/
@@ -60,7 +60,7 @@ output/
 *.tif
 *.tiff
 *.bmp
-*.npy
+# *.npy
 *.npz
 
 # Misc
