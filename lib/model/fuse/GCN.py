@@ -96,16 +96,11 @@ class HandEmbNet(nn.Module):
         pd_kpt[:, :, 2] = pd_kpt[:, :, 2] * 150
 
         x = x[:, self.KPT_TO_ANG]  # (B, 15, 128)
-
-        # jgcn
-        jgcn_emb = x.reshape(x.shape[0], -1)
-
         x = self.block2(x)
         pd_ang = self.dec_ang(x)
         pd_emb = self.dec_emb(x)  # (B, 15, 128)
         pd_emb = pd_emb.reshape(pd_emb.shape[0], -1)
-        # return pd_emb, pd_kpt, pd_ang
-        return jgcn_emb, pd_kpt, pd_ang
+        return pd_emb, pd_kpt, pd_ang
 
     def criterion_kpt(self, pd, gt):
         # gt: (B, 21, 3)

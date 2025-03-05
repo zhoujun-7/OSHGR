@@ -38,11 +38,6 @@ class CosClassifier(nn.Module):
     def forward(self, emb, save=False):
         logit = self.forward_cos(emb, self.proto, save=save)
         return logit
-    
-    def forward_ori(self, x):
-        x = F.linear(F.normalize(x, p=2, dim=-1), F.normalize(self.proto.weight, p=2, dim=-1))
-        x = 16 * x
-        return x
 
     def forward_cos(self, x, proto, save=False):
         B, _ = x.shape
@@ -98,7 +93,7 @@ class CosClassifier(nn.Module):
         _proto = F.normalize(_proto.reshape(B, N, -1), p=2, dim=-1)
         logit = _x * _proto  # (B, N, 15, 128)
 
-        logit = logit.reshape(B, N, 15, 128) * ang_w2[..., None].clone().detach()
+        logit = logit.reshape(B, N, 15, 128) * ang_w2[..., None]
         logit = logit.reshape(B, N, -1)
         
         # logit = logit * ang_w

@@ -1,33 +1,12 @@
-import os
-import time
 import tqdm
-import random
-import numpy as np
 import torch
 from pprint import pformat
-import torch.nn as nn
-import torch.distributed as distributed
-import torch.multiprocessing as mp
-import torch.nn.functional as F
 from torch.utils.data import DataLoader, ConcatDataset
-from torch.cuda.amp.grad_scaler import GradScaler
-from torch.utils.data.distributed import DistributedSampler
 
-from .base_trainer import BaseTrainer
 from ..model.angle_build import BaseNet, MyNet
-from ..tool.misc import setup_DDP_logger, MultiLoopTimeCounter, count_acc
-from ..dataset.bighand import BigHand
-from ..dataset.oshgr import (
-    UnconstrainedPretrain,
-    UnconstrainedFSSIHGR,
-    UnconstrainedFSCIHGR,
-    ConstrainedFSSIHGR,
-    ConstrainedFSCIHGR,
-)
-from ..dataset.oshgr_shape import UnconstrainedFSSIHGR
-from ..dataset.sampler import DDP_CategoriesSampler, CategoriesSampler
-from ..tool.visulize_fn import detach_and_draw_batch_img, draw_image_pose, save_dealed_batch
-from lib.tool.hand_fn import local_pose_2_image_pose
+from ..tool.misc import setup_DDP_logger
+from ..dataset.novel_shape import ShapeDataset
+from ..dataset.novel_class import ClassDataset
 
 
 class IncrementalTrainer:
@@ -71,25 +50,21 @@ class IncrementalTrainer:
         self.model.to(self.RANK)
 
     def incr_shape(self):
-        shape_ls = ["Bare", "Glove_Thin", "Glove_Half-finger", "Glove_Thick"]
+        shape_ls = ["Bare", "Thin", "Half-finger", "Thick"]
 
         shape_acc_dt = {}
         shape_test_set = []
-
-        from collections import defaultdict
-        save_dt = defaultdict(list)
-
         for i, shape in enumerate(shape_ls):
             print(shape)
 
             if shape != "Bare":
-                incr_shape_dataset = UnconstrainedFSSIHGR(
-                    PHASE="incremental",
+                incr_shape_dataset = ShapeDataset(
                     INCR_SHAPE=shape,
-                    INCR_SHOT=self.cfg.DATASET.INCR_SHOT,
+                    DATA_DIR="data/OHG_cropped/TrainingNovelShape",
                     IS_AUGMENT=self.cfg.AUGMENT.INCR_AUGMENT,
                 )
-                incr_shape_dataset.label_ls += self.cfg.DATASET.NUM_BASE_CLASS * (i)
+
+                incr_shape_dataset.label_ls += self.cfg.DATASET.NUM_BASE_CLASS * (i + 1)
 
                 incr_shape_dataloader = DataLoader(
                     dataset=incr_shape_dataset,
@@ -100,25 +75,22 @@ class IncrementalTrainer:
 
                 self.model.incremental_training(incr_shape_dataloader, self.cfg.AUGMENT.NUM_INCR_AUGMENT)
 
-                test_shape_dataset = UnconstrainedFSSIHGR(
-                    PHASE="test",
+                test_shape_dataset = ShapeDataset(
                     INCR_SHAPE=shape,
+                    DATA_DIR="data/OHG_cropped/EvaluationShape",
                 )
-                test_shape_dataset.label_ls += self.cfg.DATASET.NUM_BASE_CLASS * (i)
-                print(np.unique(test_shape_dataset.label_ls))
 
             else:
-                test_shape_dataset = UnconstrainedFSCIHGR(
-                    PHASE="test",
-                    SESSION=0,
+                test_shape_dataset = ClassDataset(
+                    DATA_DIR="data/OHG_cropped/EvaluationClass",
+                    LABELS=list(range(23)),
+                    IS_AUGMENT=False,
                 )
 
 
             print("classifier number: ", self.model.classifier.proto.weight.shape[0])
 
-
             shape_test_set.append(test_shape_dataset)
-            # test_cat_dataset = ConcatDataset(shape_test_set)
             test_cat_dataset = ConcatDataset(shape_test_set)
             test_shape_dataloader = DataLoader(
                 dataset=test_cat_dataset,
@@ -130,8 +102,9 @@ class IncrementalTrainer:
 
             all_logit = []
             all_label = []
+
             with torch.no_grad():
-                for image, noise_image, label, pose, angle, timestamp in tqdm.tqdm(
+                for image, noise_image, label, pose, angle, _ in tqdm.tqdm(
                     test_shape_dataloader, desc=f"{len(test_cat_dataset)}"
                 ):
                     x_dt = {"image": image.to(self.RANK)}
@@ -139,27 +112,13 @@ class IncrementalTrainer:
                     pd_dt, loss_dt = self.model(x_dt, gt_dt, phase="test")
                     all_logit.append(pd_dt["logit"])
                     all_label.append(gt_dt["class"])
-
-                #     # region [tmp]
-                #     if shape == "Glove_Thick":
-                #         save_dt["emb"].append(pd_dt["emb"][:, :1920].clone().detach().cpu().numpy())
-                #         save_dt["label"].append(label.clone().detach().cpu().numpy())
-                #         save_dt["image"].append(image.clone().detach().cpu().numpy())
-
-                # if shape == "Glove_Thick":
-                #     save_path = "out/tmm_review/hand-shape_emb-label-image.pkl"
-                #     os.makedirs(os.path.dirname(save_path), exist_ok=True)
-                #     import pickle
-                #     with open(save_path, "wb") as f:
-                #         pickle.dump(save_dt, f)
-                #     # endregion [tmp]
-
-
+                    
+                    print(pd_dt["logit"][:3])
+                    print(gt_dt["class"][:3])
 
             all_logit = torch.cat(all_logit)
             all_label = torch.cat(all_label)
 
-            # all_pred = torch.argmax(all_logit[:, :23], dim=1)
             all_pred = torch.argmax(all_logit, dim=1)
             all_pred = all_pred % self.cfg.DATASET.NUM_BASE_CLASS
             all_label = all_label % self.cfg.DATASET.NUM_BASE_CLASS
@@ -168,37 +127,6 @@ class IncrementalTrainer:
             acc = float(f"{acc:.2f}")
             shape_acc_dt[shape] = acc
 
-            print(f"{shape}: ", acc)
-
-            # region [extend finger]
-            unextend_gesture = [1, 3, 5, 12, 13, 14, 17, 18, 22]
-            extend_gesture = [2, 4, 6, 7, 8, 9, 10, 11, 15, 16, 19, 20, 21, 23]
-
-            is_extend = []
-            for all_label_i in all_label:
-                if all_label_i+1 in unextend_gesture:
-                    is_extend.append(False)
-                elif all_label_i+1 in extend_gesture:
-                    is_extend.append(True)
-                else:
-                    raise ValueError("gesture not in extend or unextend gesture")
-            is_extend = torch.tensor(is_extend).to(self.RANK)
-
-            extend_label = all_label[is_extend]
-            extend_pred = all_pred[is_extend]
-            extend_acc = (extend_label == extend_pred).to(torch.float32).mean().item() * 100
-
-            unextend_label = all_label[~is_extend]
-            unextend_pred = all_pred[~is_extend]
-            unextend_acc = (unextend_label == unextend_pred).to(torch.float32).mean().item() * 100
-
-            extend_acc = float(f"{extend_acc:.2f}")
-            unextend_acc = float(f"{unextend_acc:.2f}")
-
-            print(f'extend num: {extend_label.shape[0]}, unextend num: {unextend_label.shape[0]}')
-            print(f"extend: {extend_acc}, unextend: {unextend_acc}")
-            # endregion [extend finger]
-        
         return shape_acc_dt
 
 
@@ -207,8 +135,10 @@ class IncrementalTrainer:
         self.setup_model()
 
         self.model.train(False)
-        update_base_dataset = UnconstrainedPretrain(
-            DATA_DIR=self.cfg.DATASET.OSHGR_DIR,
+
+        update_base_dataset = ClassDataset(
+            DATA_DIR="data/OHG_cropped/TrainingBase",
+            LABELS=list(range(23)),
             RESOLUTION=self.cfg.DATASET.RESOLUTION,
             DEPTH_NORMALIZE=self.cfg.DATASET.DEPTH_NORMALIZE,
             IS_AUGMENT=False,

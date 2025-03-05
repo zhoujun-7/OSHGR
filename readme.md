@@ -2,8 +2,6 @@
 
 This is the official repository for the paper "Hand Gesture Recognition from an Open-Set Perspective".
 
-We are working on cleaning the code and the dataset, which expected to be finished in few weeks.
-
 
 ## Installation
 
@@ -12,35 +10,33 @@ conda env create -f environment.yml
 conda activate oshgr
 ```
 
-## MANO for OHG dataset
+## OHG dataset
+
+Click [here](https://drive.google.com/file/d/1rXRN4GVOqtKDk0UnHRs5P70hJQ7Hayg9/view?usp=sharing) to download the pre-processed OHG dataset.
+
+### MANO for OHG dataset
 ```
 cd GestureMano
 python show.py
 ```
 
-## Pretrain
+## Checkpoint
 
+Click [here](https://drive.google.com/file/d/11Tl0g_VjV8GY0eFj9i1e1EO5D5j8olCw/view?usp=sharing) to download the checkpoint. Put the checkpoint in the `checkpoint` folder.
+
+## Few-shot incremental Learning novel gesture class
 ```bash
-python Pretrain.py
+python main_class.py
 ```
 
-## Evaluation
-### on Few-shot incremental learning under unconstrained viewpoint
+### Few-shot incremental Learning novel hand shape
 
 ```bash
-python main.py
+python main_shape.py
 ```
 
 
-## TODO
-
-- [ ] Clean the redundant codes
-- [x] Upload mano parameters for OHG dataset.
-- [ ] upload processed OHG dataset.
-
-
-
-if you find this work useful, please consider citing:
+If you find this work useful, please consider citing:
 
 ```bibtex
 @ARTICLE{TMM25_OSHGR,

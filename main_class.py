@@ -1,22 +1,22 @@
 import argparse
 from lib.config.default_args import update_args
-from lib.engine.angle_incremental_trainer import IncrementalTrainer
+from lib.engine.trainer_novel_class import IncrementalTrainer
 
 
 def get_command_line_parser():
     parser = argparse.ArgumentParser()
 
-    parser.add_argument("-task", type=str, default="UFSCI", choices=["UFSCI", "UFSSI", "CFSCI", "CFSSI"])
+    parser.add_argument("-task", type=str, default="NovelClassUnconstrainedViewpoint", 
+                        choices=["NovelClassUnconstrainedViewpoint", "NovelShapeUnconstrainedViewpoint"])
     # Training
     parser.add_argument("-per_gpu_batch", type=int, default=64)
     parser.add_argument("-num_work", type=int, default=8)
     parser.add_argument("-seed", type=int, default=1)
-    parser.add_argument("-checkpoint", type=str, default="log/Train/Ours/best/8.pth")
+    parser.add_argument("-checkpoint", type=str, default="checkpoint/best.pth")
     parser.add_argument("-n_shot", type=int, default=5)
 
     # Model
     ## backbone
-    # parser.add_argument("-input_noise", action="store_True")
     parser.add_argument("-backbone", type=str, default="vit", choices=["resnet18", "vit"])
     ## MAE
     parser.add_argument("-use_MAE", action="store_false")
@@ -38,6 +38,4 @@ if __name__ == "__main__":
     args = update_args(args)
 
     trainer = IncrementalTrainer(args)
-    # trainer.run()
-
     trainer.run()

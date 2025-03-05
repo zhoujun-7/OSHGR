@@ -10,7 +10,6 @@ import torch.nn.functional as F
 from .backbone.resnet import ResNet18
 from .backbone.vit import VisionTransformer
 from .classifier.angle_cos import CosClassifier
-# from .classifier.cos import CosClassifier
 from .semantic.MAE import MaskAutoEncoder
 from .joint.A2J import Anchor2Joint
 from .fuse.GCN import HandEmbNet
@@ -130,7 +129,6 @@ class MyNet(nn.Module):
 
         self.classifier = CosClassifier(emb_dim=15*128+15*3, cls_num=CLS_NUM, base_class=NUM_BASE_CLASS)
         # self.classifier = CosClassifier(emb_dim=15*128, cls_num=CLS_NUM, base_class=NUM_BASE_CLASS)
-        # self.classifier = CosClassifier(emb_dim=15*128, cls_num=CLS_NUM, base_class=NUM_BASE_CLASS)
 
         self.cls_num = CLS_NUM
 
@@ -196,15 +194,13 @@ class MyNet(nn.Module):
                     loss["syn"] = loss_syn
 
                     pd["ang2kpt"] = pd_ang2kpt
-                    pd_emb = torch.cat([pd_emb, pd["ang2kpt"][0][:, MANO_KPT_TO_ANGLE_ID2].reshape(-1,15*3)], dim=-1)
-                    pd_emb = pd_emb
+                    pd_emb = torch.cat([pd_emb, pd["ang2kpt"][0][:, MANO_KPT_TO_ANGLE_ID2].reshape(-1,15*3)], dim=-1)           
                     # pd_emb = pd["ang2kpt"][:, MANO_KPT_TO_ANGLE_ID2].reshape(-1,15*3)
-                    # pd["emb"] = pd_emb
+                    pd["emb"] = pd_emb
                 else:
                     pd["emb"] = feat_gcn
 
                 pd_logit = self.classifier(pd["emb"])
-                # pd_logit = self.classifier.forward_ori(pd["emb"])
                 loss_logit = self.classifier.criterion(pd_logit, gt["class"])
                 pd["logit"] = pd_logit
                 loss["logit"] = loss_logit
@@ -242,7 +238,7 @@ class MyNet(nn.Module):
             else:
                 pd["emb"] = feat_gcn
 
-            pd_logit = self.classifier(pd["emb"])
+            pd_logit = self.classifier(pd["emb"], save=save)
             pd["logit"] = pd_logit
 
             return pd, loss

@@ -128,7 +128,6 @@ class MyNet(nn.Module):
             emb_dim = GCN_IN_DIM
 
         self.classifier = CosClassifier(emb_dim=emb_dim, cls_num=CLS_NUM, base_class=NUM_BASE_CLASS)
-        # self.classifier = CosClassifier(emb_dim=21*768, cls_num=CLS_NUM, base_class=NUM_BASE_CLASS)
         self.cls_num = CLS_NUM
 
         self.ONLY_MAE = ONLY_MAE
@@ -176,7 +175,6 @@ class MyNet(nn.Module):
                 elif self.DOWNSAMPLE == "spatial":
                     assert self.A2J_USE
                     feat_gcn = att_map @ feat_ls[-1][:, 1:]
-                    
 
                 if self.GCN_USE:
                     pd_emb, pd_kpt, pd_ang = self.decoder_GCN(feat_gcn)
@@ -195,10 +193,8 @@ class MyNet(nn.Module):
                 else:
                     pd["emb"] = feat_gcn
 
-                pd["emb"] = pd["emb"].reshape(pd["emb"].size(0), -1)
                 pd_logit = self.classifier(pd["emb"])
                 loss_logit = self.classifier.criterion(pd_logit, gt["class"])
-                
                 pd["logit"] = pd_logit
                 loss["logit"] = loss_logit
             else:
@@ -233,7 +229,6 @@ class MyNet(nn.Module):
             else:
                 pd["emb"] = feat_gcn
 
-            pd["emb"] = pd["emb"].reshape(pd["emb"].size(0), -1)
             pd_logit = self.classifier(pd["emb"])
             pd["logit"] = pd_logit
 
@@ -252,6 +247,7 @@ class MyNet(nn.Module):
                     gt = {"class": data[2].to(device)}
 
                     pd, loss = self.forward(x, gt, phase="test")
+
                     embedding_list.append(pd["emb"].cpu())
                     label_list.append(gt["class"].cpu())
             embedding_list = torch.cat(embedding_list, dim=0)
